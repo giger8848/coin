@@ -1,0 +1,190 @@
+//@version=5
+strategy('T7.30', overlay=true, default_qty_type=strategy.percent_of_equity, initial_capital=100000, default_qty_value=100000,commission_value=0.05, slippage=0)
+
+
+//Settings
+//buyMessage = 'TVM:{"exchange":"bybit","account":"Reverse","symbol":"ETH/USDT","type":"market","side":"buy","bal_pct":' + tostring(truncate(longQty, 3)*10) + ',"open_order":"cancel","leverage":10,"token":""}:MVT'
+//sellMessage = 'TVM:{"exchange":"bybit","account":"Reverse","symbol":"ETH/USDT","type":"market","side":"sell","bal_pct":' + tostring(truncate(shortQty, 3)*10) + ',"open_order":"cancel","leverage":10,"token":""}:MVT'
+// [QTY] 를 통해 얼럿 메세지 변환 --> 롱메세지와 숏메세지에서 // 10배 레버 기준
+
+needlong = input(true, defval=true, title='Long')
+needshort = input(true, defval=true, title='Short')
+fast = input.int(25, minval=1, title='Fast channel (for stop-loss)')
+slow = input.int(40, minval=1, title='Slow channel (for entries)')
+xratio = input.float(0.7, minval=0.0, maxval=1, step=0.05, title='X-ratio')  // 초기 설정 0.7 
+closeAfter = input.int(100, minval=0, title='Close After')
+q1 = input.int(title=' qty_percent1', defval=50, minval=1)
+q2 = input.int(title=' qty_percent2', defval=50, minval=1)
+//q3 = input.int(title=' qty_percent3', defval=34, minval=1)
+tpl1 = input.float(title='Long Take profit1', defval=2, minval=0.01)
+tpl2 = input.float(title='Long Take profit2', defval=5, minval=0.01)
+//tpl3 = input.float(title='Long Take profit3', defval=5, minval=0.01)
+tps1 = input.float(title='Short Take profit1', defval=2, minval=0.01)
+tps2 = input.float(title='Short Take profit2', defval=5, minval=0.01)
+//tps3 = input.float(title='Short Take profit3', defval=5, minval=0.01)
+usetick = false  // input(false, defval = false, title = "+ 1 tick")
+useDayOnly = input(false, defval=false, title='1Day Only')
+showof = true  //input(true, defval = true, title = "Show offset")
+showll = input(true, defval=true, title='Show lines')
+showdd = false  //input(true, defval = true, title = "Show label (drawdown)")
+showbg = input(true, defval=true, title='Show background')
+fromyear = input.int(2010, defval=2010, minval=2000, maxval=2100, title='From Year')
+toyear = input.int(2100, defval=2100, minval=1900, maxval=2100, title='To Year')
+frommonth = input.int(01, defval=01, minval=01, maxval=12, title='From Month')
+tomonth = input.int(12, defval=12, minval=01, maxval=12, title='To Month')
+fromday = input.int(01, defval=01, minval=01, maxval=31, title='From day')
+today = input.int(31, defval=31, minval=01, maxval=31, title='To day')
+risklong = input.float(5, minval=0.0, maxval=99.9, title='Risk size for long, %')
+riskshort = input.float(5, minval=0.0, maxval=99.9, title='Risk size for short, %')
+longMessage = input(defval='', title='롱메세지')
+shortMessage = input(defval='', title='숏메세지')
+longCloseMessage = input(defval='', title='롱청산메세지')
+shortCloseMessage = input(defval='', title='숏청산메세지')
+
+get_round(value, precision) =>
+    math.round(value * math.pow(10, precision)) / math.pow(10, precision)
+
+//Donchian price channel fast
+hf = ta.highest(high, fast)
+lf = ta.lowest(low, fast)
+center = (hf + lf) / 2
+
+//Donchian price chennal slow
+tick = usetick ? syminfo.mintick : 0
+hs = ta.highest(high, slow) + tick
+ls = ta.lowest(low, slow) - tick
+
+//Lines
+colorpc = showll ? color.blue : na
+colorsl = showll ? color.red : na
+offset = showof ? 1 : 0
+plot(hs, offset=offset, color=colorpc, title='Slow channel high')
+plot(ls, offset=offset, color=colorpc, title='Slow channel low')
+plot(center, offset=offset, color=colorsl, title='Fast channel stop-loss')
+
+//Background
+size = strategy.position_size
+colorbg = showbg == false ? na : size > 0 ? color.lime : size < 0 ? color.red : na
+bgcolor(colorbg, transp=70)
+
+//Var
+loss = 0.0
+maxloss = 0.0
+equity = 0.0
+truetime = time > timestamp(fromyear, frommonth, fromday, 00, 00) and time < timestamp(toyear, tomonth, today, 23, 59)
+
+//Lot size
+risksizelong = -1 * risklong
+risklonga = (center / hs - 1) * 100
+coeflong = math.abs(risksizelong / risklonga)
+lotlong = strategy.equity / close * coeflong
+risksizeshort = -1 * riskshort
+riskshorta = (center / ls - 1) * 100
+coefshort = math.abs(risksizeshort / riskshorta)
+lotshort = strategy.equity / close * coefshort
+truncate(number, decimals) =>
+    factor = math.pow(10, decimals)
+    int(number * factor) / factor
+
+longQty = lotlong * hs / strategy.equity
+shortQty = lotshort * ls / strategy.equity
+
+//얼럿 전송용이라 플롯은 가려둠
+//plot(lotlong)
+//plot(lotshort)
+//plot(strategy.equity, color=color.new(color.red, 0))
+//plot(longQty * 10)
+//plot(shortQty * 10, color=color.new(color.lime, 0))
+//plot((close - open) / (high - low), color=color.new(color.red, 0))
+
+in_long = strategy.position_size > 0
+in_short = strategy.position_size < 0
+
+lCon = hs[1] == hs ? true : false
+sCon = ls[1] == ls ? true : false
+dCon = (dayofweek==2  or dayofweek==3 or dayofweek==4 or dayofweek==5 or dayofweek==6)
+
+
+
+dayClose = time(timeframe.period, '2300-2400:23456') ? true : na
+
+passed_time = 0.0
+if strategy.position_size != 0
+    passed_time := 1
+    passed_time
+
+else
+    passed_time := 0
+    passed_time
+
+if strategy.position_size != 0 and strategy.position_size[1] != 0
+    passed_time := passed_time[1] + 1
+    passed_time
+
+if closeAfter != 0 and passed_time >= closeAfter or useDayOnly and dayClose
+    strategy.cancel_all()
+    //strategy.close_all(alert_message='')
+    if strategy.position_size > 0
+        strategy.close_all(alert_message=longCloseMessage)
+    else if strategy.position_size < 0
+        strategy.close_all(alert_message=shortCloseMessage)
+main1 = (close - open) / (high - low) > xratio
+main2 = (close - open) / (high - low) < -xratio
+
+//Order
+strategy.entry('Long 1', strategy.long, qty=lotlong * (q1 / 100), stop=hs, when=needlong and strategy.position_size == 0 and hs > 0 and truetime and lCon and main1, alert_message=str.replace_all(longMessage, '[QTY]', str.tostring(truncate(longQty, 3) * 10)))
+strategy.entry('Long 2', strategy.long, qty=lotlong * (q2 / 100), stop=hs, when=needlong and strategy.position_size == 0 and hs > 0 and truetime and lCon and main1)
+//strategy.entry('Long 3', strategy.long, qty=lotlong * (q3 / 100), stop=hs, when=needlong and strategy.position_size == 0 and hs > 0 and truetime and lCon and main1)
+strategy.entry('Short 1', strategy.short, qty=lotshort * (q1 / 100), stop=ls, when=needshort and strategy.position_size == 0 and ls > 0 and truetime and sCon and main2, alert_message=str.replace_all(shortMessage, '[QTY]', str.tostring(truncate(shortQty, 3) * 10)))
+strategy.entry('Short 2', strategy.short, qty=lotshort * (q2 / 100), stop=ls, when=needshort and strategy.position_size == 0 and ls > 0 and truetime and sCon and main2)
+//strategy.entry('Short 3', strategy.short, qty=lotshort * (q3 / 100), stop=ls, when=needshort and strategy.position_size == 0 and ls > 0 and truetime and sCon and main2)
+
+if showdd
+    //Drawdown
+    max = 0.0
+    max := math.max(strategy.equity, nz(max[1]))
+    dd = (strategy.equity / max - 1) * 100
+    min = 100.0
+    min := math.min(dd, nz(min[1]))
+
+    //Max loss size
+    equity := strategy.position_size == 0 ? strategy.equity : equity[1]
+    loss := equity < equity[1] ? (equity / equity[1] - 1) * 100 : 0
+    maxloss := math.min(nz(maxloss[1]), loss)
+
+    //Shift
+    shift = math.abs((close / center - 1) * 100)
+
+    //Label
+    min := math.round(min * 100) / 100
+    maxloss := math.round(maxloss * 100) / 100
+    shift := math.round(shift * 100) / 100
+    labeltext = 'Drawdown: ' + str.tostring(min) + '%' + '\nMax.loss ' + str.tostring(maxloss) + '%' + '\nShift ' + str.tostring(shift) + '%'
+    var label la = na
+    label.delete(la)
+    tc = min > -100 ? color.white : color.red
+    osx = timenow + math.round(ta.change(time) * 10)
+    osy = ta.highest(100)
+    la := label.new(x=osx, y=osy, text=labeltext, xloc=xloc.bar_time, yloc=yloc.price, color=color.black, style=label.style_label_up, textcolor=tc)
+    la
+
+per(pcnt) =>
+    strategy.position_size != 0 ? math.round(pcnt / 100 * strategy.position_avg_price / syminfo.mintick) : float(na)
+
+//stoploss=input(title=" stop loss", defval=25, minval=0.01)
+
+//los = per(stoploss)
+
+strategy.exit('x1', 'Long 1', profit=per(tpl1), stop=center)
+strategy.exit('x2', 'Long 2', profit=per(tpl2), stop=center, alert_message=longCloseMessage)
+//strategy.exit('x3', 'Long 3', profit=per(tpl3), stop=center, alert_message=longCloseMessage)
+strategy.exit('x1', 'Short 1', profit=per(tps1), stop=center)
+strategy.exit('x2', 'Short 2', profit=per(tps2),  stop=center, alert_message=shortCloseMessage)
+//strategy.exit('x3', 'Short 3', profit=per(tps3), stop=center, alert_message=shortCloseMessage)
+
+// 수익율 표시를 위한 함수
+import Cube_Lee/PerformanceTable/1 as PT
+
+MT = input.bool(true, "Show Monthly Table", tooltip = "년월 수익율 표시", group = "Performance Table")
+if MT
+    PT.MonthlyTable()
