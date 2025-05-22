@@ -1,1 +1,1 @@
-# coin
+# coin co-project
