@@ -517,7 +517,7 @@ class MultiSymbolAutoTrader:
     def initialize_exchange(self):
         """거래소 API 초기화"""
         try:
-            exchange = ccxt.bybit({
+            exchange = ccxt.okx({
                 'apiKey': self.settings['api_key'],
                 'secret': self.settings['secret_key'],
                 'password': self.settings['password'],
@@ -534,37 +534,33 @@ class MultiSymbolAutoTrader:
             self.log(error_msg)
             raise Exception(error_msg)
 
-def check_and_set_position_mode(self, exchange):
-    """포지션 모드 확인 및 설정"""
-    try:
-        account_config = exchange.privateGetAccountConfig()
-        if not account_config or 'data' not in account_config:
-            self.log("계좌 구성 데이터를 받지 못했습니다.")
-            return
-        
-        for config in account_config['data']:
-            if config.get('instType') == 'SWAP':
-                pos_mode = config.get('posMode')
-                self.log(f"현재 포지션 모드: {pos_mode}")
-                
-                if pos_mode == 'net_mode':
-                    self.position_mode = 'net_mode'
-                else:
-                    try:
-                        result = exchange.privatePostAccountSetPositionMode({
-                            'posMode': 'net_mode'
-                        })
-                        if result and result.get('code') == '0':
-                            self.log("단방향 모드로 변경 성공")
-                            self.position_mode = 'net_mode'
-                        else:
-                            self.log(f"포지션 모드 변경 실패 또는 예상치 못한 응답: {result}")
-                    except Exception as e:
-                        self.log(f"포지션 모드 변경 예외: {str(e)}")
-                break
-    except Exception as e:
-        self.log(f"포지션 모드 확인 실패: {str(e)}")
-        self.position_mode = 'net_mode'
+    def check_and_set_position_mode(self, exchange):
+        """포지션 모드 확인 및 설정"""
+        try:
+            account_config = exchange.privateGetAccountConfig()
+            
+            for config in account_config['data']:
+                if config['instType'] == 'SWAP':
+                    pos_mode = config['posMode']
+                    self.log(f"현재 포지션 모드: {pos_mode}")
+                    
+                    if pos_mode == 'net_mode':
+                        self.position_mode = 'net_mode'
+                    else:
+                        try:
+                            result = exchange.privatePostAccountSetPositionMode({
+                                'posMode': 'net_mode'
+                            })
+                            if result['code'] == '0':
+                                self.log("단방향 모드로 변경 성공")
+                                self.position_mode = 'net_mode'
+                        except Exception as e:
+                            self.log(f"포지션 모드 변경 실패: {str(e)}")
+                    break
+                    
+        except Exception as e:
+            self.log(f"포지션 모드 확인 실패: {str(e)}")
+            self.position_mode = 'net_mode'
 
     def set_leverages(self):
         """레버리지 설정"""
@@ -1433,21 +1429,21 @@ class TradingGUI:
         self.api_key_entry = ttk.Entry(api_frame, width=50, show='*')
         self.api_key_entry.grid(row=0, column=1, padx=5, pady=5)
         # 기본값 설정
-        self.api_key_entry.insert(0, 'fKraiBrJsjPqgu2lQi')
+        # self.api_key_entry.insert(0, 'jlkhohihl')
         
         # Secret Key
         ttk.Label(api_frame, text="Secret Key:").grid(row=1, column=0, sticky='w', padx=5, pady=5)
         self.secret_key_entry = ttk.Entry(api_frame, width=50, show='*')
         self.secret_key_entry.grid(row=1, column=1, padx=5, pady=5)
         # 기본값 설정
-        self.secret_key_entry.insert(0, 'WJM6gsSMMEF9cSNvr2FUrnWKs9TPB6yUJCYe')        
+        # self.secret_key_entry.insert(0, 'jlkhohihl')        
         
         # Password
         ttk.Label(api_frame, text="Password:").grid(row=2, column=0, sticky='w', padx=5, pady=5)
         self.password_entry = ttk.Entry(api_frame, width=50, show='*')
         self.password_entry.grid(row=2, column=1, padx=5, pady=5)
         # 기본값 설정
-        self.password_entry.insert(0, 'jlkhohihl')     
+        # self.password_entry.insert(0, 'jlkhohihl')        
 
     def setup_trading_tab(self):
         """거래 설정 탭"""
@@ -1462,15 +1458,15 @@ class TradingGUI:
         
         self.symbol1_entry = ttk.Entry(symbol_frame, width=20)
         self.symbol1_entry.pack(side='left', padx=(0, 5))
-        self.symbol1_entry.insert(0, "XRP/USDT")
+        self.symbol1_entry.insert(0, "XRP/USDT:USDT")
         
         self.symbol2_entry = ttk.Entry(symbol_frame, width=20)
         self.symbol2_entry.pack(side='left', padx=5)
-        self.symbol2_entry.insert(0, "DOGE/USDT")
+        self.symbol2_entry.insert(0, "DOGE/USDT:USDT")
         
         self.symbol3_entry = ttk.Entry(symbol_frame, width=20)
         self.symbol3_entry.pack(side='left', padx=5)
-        self.symbol3_entry.insert(0, "ADA/USDT")
+        self.symbol3_entry.insert(0, "ADA/USDT:USDT")
         
         # 레버리지
         ttk.Label(trading_frame, text="레버리지:").grid(row=1, column=0, sticky='w', padx=5, pady=5)
