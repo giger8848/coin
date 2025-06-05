@@ -1,48 +1,49 @@
-//@version=4
-study(title="DB_C", overlay=true, shorttitle="MCI", format=format.price, precision=2)
+//@version=5
+indicator(title='DB_C', overlay=true, shorttitle='DB_C', format=format.price, precision=2)
 
 // 밴드 선택 드롭다운
-band_type = input(title="밴드 종류", type=input.string, defval="Bollinger Bands", options=["Donchian Channel", "Keltner Channel", "Bollinger Bands"])
+band_type = input.string(title='밴드 종류', defval='Bollinger Bands', options=['Donchian Channel', 'Keltner Channel', 'Bollinger Bands'])
 
 // 밴드 A 입력값
-bandA_length = input(20, title="밴드 A 길이", minval=1)
-bandA_mult = input(2.0, title="밴드 A 편차/계수", minval=1.0, maxval=5.0)
+bandA_length = input.int(20, title='밴드 A 길이', minval=1)
+bandA_mult = input.float(2.0, title='밴드 A 편차/계수', minval=1.0, maxval=5.0)
 
 // 밴드 B 입력값
-bandB_length = input(40, title="밴드 B 길이", minval=1)
-bandB_mult = input(2.0, title="밴드 B 편차/계수", minval=1.0, maxval=5.0)
+bandB_length = input.int(40, title='밴드 B 길이', minval=1)
+bandB_mult = input.float(2.0, title='밴드 B 편차/계수', minval=1.0, maxval=5.0)
 
 // Donchian Channel 계산
-donchian_high = highest(high, bandA_length)[1]
-donchian_low = lowest(low, bandA_length)[1]
+donchian_high = ta.highest(high, bandA_length)[1]
+donchian_low = ta.lowest(low, bandA_length)[1]
 donchian_mid = (donchian_high + donchian_low) / 2
 
 // Keltner Channel 계산 (수동 구현)
-keltner_mid = ema(close, bandA_length)
-keltner_atr = atr(bandA_length)
-keltner_upper = keltner_mid + (keltner_atr * bandA_mult)
-keltner_lower = keltner_mid - (keltner_atr * bandA_mult)
+keltner_mid = ta.ema(close, bandA_length)
+keltner_atr = ta.atr(bandA_length)
+keltner_upper = keltner_mid + keltner_atr * bandA_mult
+keltner_lower = keltner_mid - keltner_atr * bandA_mult
 
 // Bollinger Bands 계산
-[bollinger_mid, bollinger_upper, bollinger_lower] = bb(close, bandA_length, bandA_mult)
+[bollinger_mid, bollinger_upper, bollinger_lower] = ta.bb(close, bandA_length, bandA_mult)
 
 // 밴드 B 계산 (모든 밴드 유형에 대해 동일한 길이와 편차 적용)
-donchian_high_B = highest(high, bandB_length)[1]
-donchian_low_B = lowest(low, bandB_length)[1]
+donchian_high_B = ta.highest(high, bandB_length)[1]
+donchian_low_B = ta.lowest(low, bandB_length)[1]
 donchian_mid_B = (donchian_high_B + donchian_low_B) / 2
 
-keltner_mid_B = sma(close, bandB_length)
-keltner_atr_B = atr(bandB_length)
-keltner_upper_B = keltner_mid_B + (keltner_atr_B * bandB_mult)
-keltner_lower_B = keltner_mid_B - (keltner_atr_B * bandB_mult)
+keltner_mid_B = ta.sma(close, bandB_length)
+keltner_atr_B = ta.atr(bandB_length)
+keltner_upper_B = keltner_mid_B + keltner_atr_B * bandB_mult
+keltner_lower_B = keltner_mid_B - keltner_atr_B * bandB_mult
 
-[bollinger_mid_B, bollinger_upper_B, bollinger_lower_B] = bb(close, bandB_length, bandB_mult)
+[bollinger_mid_B, bollinger_upper_B, bollinger_lower_B] = ta.bb(close, bandB_length, bandB_mult)
 
 // 선택된 밴드에 따라 플롯
-plot(band_type == "Donchian Channel" ? donchian_high : band_type == "Keltner Channel" ? keltner_upper : bollinger_upper, "상단A", color=color.green)
-plot(band_type == "Donchian Channel" ? donchian_low : band_type == "Keltner Channel" ? keltner_lower : bollinger_lower, "하단A", color=color.red)
-plot(band_type == "Donchian Channel" ? donchian_mid : band_type == "Keltner Channel" ? keltner_mid : bollinger_mid, "중단A", color=color.blue)
+plot(band_type == 'Donchian Channel' ? donchian_high : band_type == 'Keltner Channel' ? keltner_upper : bollinger_upper, '상단A', color=color.new(color.green, 0))
+plot(band_type == 'Donchian Channel' ? donchian_low : band_type == 'Keltner Channel' ? keltner_lower : bollinger_lower, '하단A', color=color.new(color.red, 0))
+plot(band_type == 'Donchian Channel' ? donchian_mid : band_type == 'Keltner Channel' ? keltner_mid : bollinger_mid, '중단A', color=color.new(color.blue, 0))
 
-plot(band_type == "Donchian Channel" ? donchian_high_B : band_type == "Keltner Channel" ? keltner_upper_B : bollinger_upper_B, "상단B", color=color.lime)
-plot(band_type == "Donchian Channel" ? donchian_low_B : band_type == "Keltner Channel" ? keltner_lower_B : bollinger_lower_B, "하단B", color=color.maroon)
-plot(band_type == "Donchian Channel" ? donchian_mid_B : band_type == "Keltner Channel" ? keltner_mid_B : bollinger_mid_B, "중단B", color=color.purple)
+plot(band_type == 'Donchian Channel' ? donchian_high_B : band_type == 'Keltner Channel' ? keltner_upper_B : bollinger_upper_B, '상단B', color=color.new(color.lime, 0))
+plot(band_type == 'Donchian Channel' ? donchian_low_B : band_type == 'Keltner Channel' ? keltner_lower_B : bollinger_lower_B, '하단B', color=color.new(color.maroon, 0))
+plot(band_type == 'Donchian Channel' ? donchian_mid_B : band_type == 'Keltner Channel' ? keltner_mid_B : bollinger_mid_B, '중단B', color=color.new(color.purple, 0))
+
