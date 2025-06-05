@@ -1,6 +1,8 @@
 //@version=4
 study(title = "볼밴스퀴즈필터_", shorttitle = "BB SF_copy", format=format.price, precision=1, resolution="")
-squeeze = input(4, minval=1, title="스퀴즈지준")
+squeeze = input(4, minval=1, title="스퀴즈기준")
+direction = input(title="필터값", type=input.string, defval="롱", options=["롱", "숏"])
+type = input(title="사용방향", type=input.string, defval="추세", options=["추세", "횡보"])
 length = input(20, minval=1, title="길이")
 mult = input(2.0, minval=0.001, maxval=50, title="표준편차")
 highlowlength = input(100, minval=1, title="표본수")
@@ -10,14 +12,49 @@ squeezelevel = (lowest(bandwidth, highlowlength) + highest(bandwidth, highlowlen
 short_lowest = lowest(bandwidth, highlowlength)[1]
 short_highest = highest(bandwidth, highlowlength)[1]
 
+// 조건 확인
+condition_above = bandwidth > squeezelevel
+condition_below = bandwidth < squeezelevel
+
+// 이전 신호 상태 및 캔들 카운터
+var float last_signal = 0.0
+var int bars_since_signal = 0
+
+// 신호 발생 조건
+long_trend_trigger = direction == "롱" and type == "추세" and condition_above and not condition_above[1]
+short_trend_trigger = direction == "숏" and type == "추세" and condition_above and not condition_above[1]
+long_range_trigger = direction == "롱" and type == "횡보" and condition_below and not condition_below[1]
+short_range_trigger = direction == "숏" and type == "횡보" and condition_below and not condition_below[1]
+
+// 신호 설정
+new_signal = long_trend_trigger ? 1 :
+             short_trend_trigger ? -1 :
+             long_range_trigger ? 1 :
+             short_range_trigger ? -1 : 0
+
+// 신호가 발생하면 카운터와 신호값 업데이트
+if new_signal != 0
+    last_signal := new_signal
+    bars_since_signal := 0
+else
+    bars_since_signal := bars_since_signal[1] + 1
+
+// 5캔들 이후 신호 리셋
+SF = bars_since_signal <= 5 ? last_signal : 0
+
 // Plot bandwidth
-plot(bandwidth, "Bollinger Bandwidth", color=color.white)
+plot(bandwidth, "볼밴 너비", color=color.white)
 
 // Plot price when bandwidth equals short_highest or short_lowest
-p1 = plot(short_highest, color=color.green, title="Lowest")
-p2 = plot(short_lowest, color=color.red, title="Highest")
-p3 = plot(squeezelevel, color=color.gray, title="squeeze")
+p1 = plot(short_highest, color=color.green, title="볼밴 너비 하단")
+p2 = plot(short_lowest, color=color.red, title="볼밴 너비 상단")
+p3 = plot(squeezelevel, color=color.gray, title="볼밴 너비 중단")
+p4 = plot(SF, color=color.blue, title="볼밴 SF")
 
+// Plot SF for debugging
+//plot(SF, "SF", color=color.orange, style=plot.style_histogram)
 
 // Background fill based on bandwidth condition
 //fill(p1, p2, color = bandwidth> short_lowest? color.green : color.red, title="Background")
+
+  
