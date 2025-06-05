@@ -1,0 +1,23 @@
+//@version=4
+study(title = "볼밴스퀴즈필터_", shorttitle = "BB SF_copy", format=format.price, precision=1, resolution="")
+squeeze = input(4, minval=1, title="스퀴즈지준")
+length = input(20, minval=1, title="길이")
+mult = input(2.0, minval=0.001, maxval=50, title="표준편차")
+highlowlength = input(100, minval=1, title="표본수")
+[main, top, bottom] = bb(close, length, mult)
+bandwidth = (top-bottom)/main*100
+squeezelevel = (lowest(bandwidth, highlowlength) + highest(bandwidth, highlowlength))/squeeze
+short_lowest = lowest(bandwidth, highlowlength)[1]
+short_highest = highest(bandwidth, highlowlength)[1]
+
+// Plot bandwidth
+plot(bandwidth, "Bollinger Bandwidth", color=color.white)
+
+// Plot price when bandwidth equals short_highest or short_lowest
+p1 = plot(short_highest, color=color.green, title="Lowest")
+p2 = plot(short_lowest, color=color.red, title="Highest")
+p3 = plot(squeezelevel, color=color.gray, title="squeeze")
+
+
+// Background fill based on bandwidth condition
+//fill(p1, p2, color = bandwidth> short_lowest? color.green : color.red, title="Background")
